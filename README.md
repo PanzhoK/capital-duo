@@ -16,6 +16,8 @@ Ejecutar `npm run preview`. Compila y prepara `.preview-dist/` copiando únicame
 
 Para un futuro túnel, el destino será únicamente `http://127.0.0.1:4174`, con Host de upstream `127.0.0.1:4174`. `CAPITAL_DUO_PREVIEW_ORIGIN` permite declarar un solo origen HTTPS exacto cuando se conozca el enlace; por defecto está vacío. Se rechazan comodines, credenciales, rutas, puertos adicionales y listas de orígenes. Esta variable no abre conexiones, no habilita CORS y no cambia el bind ni Host. No usar el puerto 4173 ni servir la raíz del proyecto. La configuración real del proveedor sigue pendiente de revisar antes de abrir cualquier túnel. Véase [informe de seguridad](SECURITY_REVIEW.md).
 
+**Acceso externo bloqueado por la revisión del runtime:** el Node local v22.22.2 no incluye parches posteriores y existe un aviso oficial de gravedad alta pendiente para la línea 22. Actualmente configurar cualquier origen público impide iniciar el servidor; no hay una variable para omitir el bloqueo. La demo local sigue disponible sin origen público. Actualizar/revisar Node y el aviso de seguridad, y después revisar la configuración del proveedor, son requisitos antes de levantar el bloqueo. No se modificó la instalación global.
+
 ## Contabilidad
 
 - Montos en CLP enteros positivos; costos pueden ser cero. Máximo $1.000.000.000.000 por movimiento. Se validan enteros seguros y acumulaciones.

@@ -6,7 +6,9 @@ import {resolve,dirname} from 'node:path';
 const projectRoot=fileURLToPath(new URL('./',import.meta.url));
 export const PUBLIC_FILES=Object.freeze(['index.html','app.js','ledger.js','style.css','runtime.js','format.js','storage.js','demo.js','views.js','game-ui.js','animation.js','sound.js','scene.js']);
 export const CSP="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'none'; manifest-src 'none'";
+export const EXTERNAL_PREVIEW_BLOCK_REASON='Acceso externo bloqueado: actualizar y revisar el runtime Node y sus avisos de seguridad antes de habilitar un origen público.';
 const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8'};
+const MAX_REQUEST_HEADERS=100;
 
 // Read an explicit set of build assets once; requests never determine filesystem paths.
 export async function readStaticAssets(preview=false){
@@ -37,6 +39,8 @@ export function validatePreviewOrigin(value){
 
 export function createStaticServer(assets,{publicOrigin=null}={}){
  const exactPublicOrigin=validatePreviewOrigin(publicOrigin);
+ // Keep the local demo available while runtime security clearance is pending.
+ if(exactPublicOrigin)throw new Error(EXTERNAL_PREVIEW_BLOCK_REASON);
  const server=http.createServer({maxHeaderSize:8192},(req,res)=>{
   res.setHeader('Content-Security-Policy',CSP);
   res.setHeader('X-Content-Type-Options','nosniff');
@@ -47,6 +51,8 @@ export function createStaticServer(assets,{publicOrigin=null}={}){
   res.setHeader('Cross-Origin-Opener-Policy','same-origin');
   res.setHeader('Cache-Control','no-store');
   const reject=(status,message)=>{res.writeHead(status,{'Content-Type':'text/plain; charset=utf-8','Connection':'close'});res.end(req.method==='HEAD'?undefined:message);};
+  // Node may truncate exposed headers at this limit. Reject before trusting an incomplete list.
+  if(req.rawHeaders.length>=MAX_REQUEST_HEADERS*2)return reject(431,'Demasiados encabezados.');
   const address=server.address(),port=address&&typeof address==='object'?address.port:0;
   const allowedHosts=new Set([`127.0.0.1:${port}`,`localhost:${port}`]);
   const hostHeaders=req.rawHeaders.filter((_,i)=>i%2===0).filter(name=>name.toLowerCase()==='host');
@@ -56,7 +62,6 @@ export function createStaticServer(assets,{publicOrigin=null}={}){
   if(req.headers['transfer-encoding']||(req.headers['content-length']&&req.headers['content-length']!=='0'))return reject(400,'No se permiten cuerpos de solicitud.');
   // Origin and Fetch Metadata restrict browsers; they are not authentication.
   const allowedOrigins=new Set([`http://127.0.0.1:${port}`,`http://localhost:${port}`]);
-  if(exactPublicOrigin)allowedOrigins.add(exactPublicOrigin);
   if(req.headers.origin&&!allowedOrigins.has(req.headers.origin))return reject(403,'Origen no permitido.');
   if(req.headers['sec-fetch-site']==='cross-site')return reject(403,'Solicitud entre sitios no permitida.');
   const target=req.url;
@@ -67,6 +72,7 @@ export function createStaticServer(assets,{publicOrigin=null}={}){
   res.end(req.method==='HEAD'?undefined:asset.body);
  });
  server.headersTimeout=10_000;
+ server.maxHeadersCount=MAX_REQUEST_HEADERS;
  server.requestTimeout=10_000;
  server.keepAliveTimeout=5_000;
  server.maxRequestsPerSocket=100;

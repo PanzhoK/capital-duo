@@ -1,5 +1,5 @@
 import {preparePreview} from './prepare-preview.mjs';
-import {startStaticServer,validatePreviewOrigin} from '../server.mjs';
+import {startStaticServer,validatePreviewOrigin,EXTERNAL_PREVIEW_BLOCK_REASON} from '../server.mjs';
 import {build} from './build.mjs';
 try{
  await build();
@@ -10,4 +10,4 @@ try{
  console.log('Solo archivos estáticos. Sin túnel ni publicación. Ctrl+C cierra la vista previa.');
  const close=()=>{server.closeAllConnections();server.close(()=>process.exit(0));};
  process.once('SIGINT',close);process.once('SIGTERM',close);
-}catch{console.error('No se pudo iniciar la vista previa. Revisa el puerto 4174 y los archivos estáticos.');process.exitCode=1;}
+}catch(error){console.error(error.message===EXTERNAL_PREVIEW_BLOCK_REASON?EXTERNAL_PREVIEW_BLOCK_REASON:'No se pudo iniciar la vista previa. Revisa el puerto 4174 y los archivos estáticos.');process.exitCode=1;}

@@ -4,7 +4,7 @@ import http from 'node:http';
 import net from 'node:net';
 import {readdir,readFile} from 'node:fs/promises';
 import {preparePreview} from '../scripts/prepare-preview.mjs';
-import {startStaticServer,PUBLIC_FILES,CSP,validatePreviewOrigin} from '../server.mjs';
+import {startStaticServer,createStaticServer,PUBLIC_FILES,CSP,validatePreviewOrigin,EXTERNAL_PREVIEW_BLOCK_REASON} from '../server.mjs';
 
 let server,port;
 before(async()=>{await preparePreview();server=await startStaticServer({preview:true,port:0});port=server.address().port;});
@@ -86,6 +86,16 @@ test('el parser limita encabezados y rechaza cuerpos chunked o framing ambiguo',
  assert.equal((await request('/')).status,200,'the local server remains available after rejected requests');
 });
 
+test('el límite de cantidad rechaza encabezados truncados antes de confiar en el framing',async()=>{
+ assert.equal(server.maxHeadersCount,100);
+ const start='GET /runtime.js HTTP/1.1\r\nHost: localhost:'+port+'\r\n';
+ const truncated=start+'a:\r\n'.repeat(1999)+'Content-Length: 1\r\nConnection: close\r\n\r\nx';
+ assert.ok(Buffer.byteLength(truncated)<8192,'the regression must exercise the count limit below the byte limit');
+ const blocked=await rawRequest(truncated);assert.match(blocked,/HTTP\/1\.1 431/);assert.equal(blocked.includes('export const PREVIEW_ONLY'),false,'an incomplete header list must never reach static assets');
+ const atLimit=await rawRequest(start+'a:\r\n'.repeat(98)+'Connection: close\r\n\r\n');assert.match(atLimit,/HTTP\/1\.1 431/,'reaching the exposed-header limit fails closed even without a body');
+ const belowLimit=await rawRequest(start+'a:\r\n'.repeat(97)+'Connection: close\r\n\r\n');assert.match(belowLimit,/HTTP\/1\.1 200/,'normal requests below the explicit count limit remain supported');
+});
+
 test('encabezados bloquean enmarcado, conexiones y permisos innecesarios',async()=>{
  for(const path of ['/','/app.js','/scene.js','/.env']){
   const response=await request(path),h=response.headers;
@@ -94,17 +104,16 @@ test('encabezados bloquean enmarcado, conexiones y permisos innecesarios',async(
  }
  assert.equal(server.maxConnections,50);assert.equal(server.headersTimeout,10_000);assert.equal(server.requestTimeout,10_000);
 });
-test('configuración futura admite un único origen HTTPS exacto sin ampliar Host ni puertos',async()=>{
+test('configuración futura valida un único origen HTTPS exacto sin ampliar Host ni puertos',async()=>{
  assert.equal(validatePreviewOrigin(undefined),null);
  assert.equal(validatePreviewOrigin('https://preview.example'),'https://preview.example');
  for(const value of ['*','https://*.example','http://preview.example','https://preview.example:4173','https://user:secret@preview.example','https://preview.example/api','https://preview.example?port=22','https://preview.example#hash','https://a.example,https://b.example','https://a.example https://b.example'])assert.throws(()=>validatePreviewOrigin(value));
  await assert.rejects(startStaticServer({publicOrigin:'https://preview.example',port:0}),/demostración/);
- const isolated=await startStaticServer({preview:true,port:0,publicOrigin:'https://preview.example'}),isolatedPort=isolated.address().port;
- try{
-  const get=headers=>new Promise((resolve,reject)=>{const req=http.get({hostname:'127.0.0.1',port:isolatedPort,path:'/runtime.js',headers,agent:false},res=>{res.resume();res.on('end',()=>resolve(res.statusCode));});req.on('error',reject);});
-  assert.equal(await get({Origin:'https://preview.example'}),200);
-  assert.equal(await get({Origin:'https://other.example'}),403);
-  assert.equal(await get({Host:'preview.example',Origin:'https://preview.example'}),421,'proxy must preserve the loopback upstream Host');
-  assert.equal(await get({Host:'localhost:22',Origin:'https://preview.example'}),421);
- }finally{isolated.closeAllConnections();await new Promise(resolve=>isolated.close(resolve));}
+});
+test('un origen público permanece bloqueado antes de crear un listener mientras falta revisar Node',async()=>{
+ const blocked=error=>error.message===EXTERNAL_PREVIEW_BLOCK_REASON;
+ assert.throws(()=>createStaticServer(new Map(),{publicOrigin:'https://preview.example'}),blocked);
+ await assert.rejects(startStaticServer({preview:true,port:0,publicOrigin:'https://preview.example'}),blocked);
+ assert.equal((await request('/runtime.js')).status,200,'the isolated local demo remains available');
+ assert.equal((await request('/runtime.js',{headers:{Origin:'https://preview.example'}})).status,403);
 });

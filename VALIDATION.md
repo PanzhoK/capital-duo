@@ -4,7 +4,7 @@ Revisión local del 20 de octubre de 2026. No se abrió ningún túnel ni se pub
 
 ## Pruebas automatizadas
 
-- `npm test`: **53/53 aprobadas**, con compilación previa. Contabilidad, persistencia, seguridad del cliente/servidor y reproducción de ventas. La revisión de seguridad posterior agregó regresiones para almacenamiento denegado, inicialización concurrente de demostración, rutas alternativas y framing HTTP.
+- `npm test`: **55/55 aprobadas**, con compilación previa. Contabilidad, persistencia, seguridad del cliente/servidor y reproducción de ventas. La revisión de seguridad posterior agregó regresiones para almacenamiento denegado, inicialización concurrente de demostración, rutas alternativas, framing HTTP, truncamiento de cabeceras y bloqueo preventivo de orígenes públicos.
 - `npm run typecheck`: sin errores en la escena TypeScript.
 - `npm run check`: sintaxis JavaScript comprobada.
 - `npm audit --json`: cero vulnerabilidades conocidas informadas por npm en las versiones del lockfile consultado. Esto no cubre vulnerabilidades desconocidas ni el sistema operativo/runtime.
@@ -38,6 +38,8 @@ No hubo prueba en iPhone físico, Safari, medición de FPS/batería real ni estr
 Datos en este navegador, sin cifrado de aplicación, cuentas ni sincronización. Ventas cobradas y costos financiados/recuperados dentro de la misma operación. Capital contable distinto del efectivo disponible. Los déficits siguen bloqueados porque su absorción no está acordada.
 
 La vista previa sirve solo recursos compilados permitidos en loopback. La configuración concreta de un futuro proveedor de túnel, TLS y control de acceso sigue sin comprobarse; requiere otro paso. Cerrar con Ctrl+C el servidor correspondiente, y detener primero cualquier túnel si se crea posteriormente.
+
+La revisión posterior contrastó los avisos oficiales de Node y dejó **bloqueado el acceso externo** hasta actualizar/revisar el runtime y el aviso de gravedad alta pendiente para la línea 22. El puerto de demo 4174 se dejó cerrado; su compilación está preparada. El uso personal local en 4173 permanece disponible. Detalles y fuentes en SECURITY_REVIEW.md.
 
 ## Limpieza y reversión
 

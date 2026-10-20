@@ -4,7 +4,7 @@ Revisión local del 20 de octubre de 2026. No se abrió ningún túnel ni se pub
 
 ## Pruebas automatizadas
 
-- `npm test`: **48/48 aprobadas**, con compilación previa. Contabilidad, persistencia, seguridad del cliente/servidor y reproducción de ventas.
+- `npm test`: **53/53 aprobadas**, con compilación previa. Contabilidad, persistencia, seguridad del cliente/servidor y reproducción de ventas. La revisión de seguridad posterior agregó regresiones para almacenamiento denegado, inicialización concurrente de demostración, rutas alternativas y framing HTTP.
 - `npm run typecheck`: sin errores en la escena TypeScript.
 - `npm run check`: sintaxis JavaScript comprobada.
 - `npm audit --json`: cero vulnerabilidades conocidas informadas por npm en las versiones del lockfile consultado. Esto no cubre vulnerabilidades desconocidas ni el sistema operativo/runtime.

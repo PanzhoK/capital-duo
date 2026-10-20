@@ -8,7 +8,6 @@ export function readBook(storage,key,demo,makeDemo){
  try{
   raw=storage.getItem(key);
   const book=raw?parseBackup(raw):demo?makeDemo():emptyBook();
-  if(demo&&!raw){raw=JSON.stringify(book);storage.setItem(key,raw);}
   return {book,raw,state:replay(book),storageBlocked:false,loadError:''};
  }catch(error){
   const book=emptyBook();

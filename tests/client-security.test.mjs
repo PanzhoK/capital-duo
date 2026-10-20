@@ -26,7 +26,7 @@ const hostileBook=(amount=10)=>({schema:1,events:[
  {id:'correction',target:attributePayload,action:'correct',at:'2026-10-20T13:00:00Z',reason:payload,operation:operation(amount)}
 ]});
 
-function harness({preview=false,data=new Map(),locks=true}={}){
+function harness({preview=false,data=new Map(),locks=true,storageDenied=false}={}){
  const elements=new Map(),accesses=[],downloads=[];
  const element=id=>{
   if(!elements.has(id))elements.set(id,{
@@ -50,6 +50,7 @@ function harness({preview=false,data=new Map(),locks=true}={}){
   URL:{createObjectURL:()=> 'blob:in-memory-test',revokeObjectURL(){}},
   setTimeout:()=>0,clearTimeout(){},console,
  });
+ if(storageDenied)vm.runInContext("Object.defineProperty(globalThis,'localStorage',{get(){throw new Error('Storage access denied');},configurable:true});",context);
  vm.runInContext('const {PEOPLE,emptyBook,replay,append,saleBreakdown,parseBackup,saveBook,saveBookWithLock,MAX_AMOUNT}=ledger;',context);
  vm.runInContext('const {esc,fmt,dateFmt,today,icon,sum,kindLabel,table,historyView,growthView,backupView,readBook,readSettings,bookKey,settingKey,createDemoBook,gameView,personView,playbackView,createSalePlayer,lastActiveMovement,createSound}=helpers;',context);
  vm.runInContext(source,context,{filename:'app.js'});
@@ -154,6 +155,24 @@ test('sin bloqueo entre pestañas se rechaza guardar y se conservan los registro
  assert.equal(data.get('capital-duo.real.v1'),real);
  assert.equal(app.accesses.filter(access=>access.action==='set').length,0);
  assert.equal(app.run('state.total'),777);
+});
+
+test('denegar el acceso a localStorage no impide iniciar la interfaz en modo restringido',async()=>{
+ const real=JSON.stringify(hostileBook(777));
+ const data=new Map([['capital-duo.real.v1',real]]);
+ const app=harness({data,storageDenied:true});
+ assert.equal(app.run('storageBlocked'),true);
+ assert.notEqual(app.element('#storage-alert').textContent,'');
+ assert.notEqual(app.element('#content').innerHTML,'');
+ assert.equal(app.run('raw'),null);
+ assert.equal(app.run('state.total'),0);
+ await assert.rejects(async()=>app.run("commit(append(book,event({kind:'contribution',person:'Fran',amount:7,cost:0,date:'2026-10-20',description:'Guardado bloqueado'})))"),/almacenamiento/);
+ app.run("openMovement('contribution')");
+ assert.equal(app.element('#movement-dialog').open,false);
+ app.run("changeView('backup'); exportBook();");
+ assert.match(app.element('#info-body').innerHTML,/respaldo/i);
+ assert.equal(data.get('capital-duo.real.v1'),real);
+ assert.equal(app.accesses.length,0);
 });
 
 test('un guardado en curso bloquea cambios de modo y segundos envíos',async()=>{

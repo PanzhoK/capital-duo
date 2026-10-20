@@ -43,7 +43,8 @@ test('el bundle local de Three está autorizado, conserva su tipo y coincide con
  assert.equal(response.headers['access-control-allow-origin'],undefined);
 });
 test('archivos sensibles, recorridos y rutas administrativas no están expuestos',async()=>{
- const blocked=['/.env','/.env.local','/.git/config','/.openai/hosting.json','/README.md','/package.json','/server.mjs','/tests/example-backup.json','/capital-duo-desktop.png','/dist/index.html','/../README.md','/%2e%2e/README.md','/..%2f..%2fWindows/win.ini','/%2e%2e%5c..%5cWindows%5cwin.ini','/C:/Windows/win.ini','/app.js/../../.git/config','/__proto__','/constructor','/toString','/api','/api/movements','/api/export','/admin','/debug','/json/version','/@vite/client','/__vite_ping','/node_modules','/runtime.js.map','/backup.json','/src/scene.ts','/scene.ts','/src/app.js','/src/ledger.js','/node_modules/three/build/three.module.js','/scene.js.map','/scripts/build.mjs','/package-lock.json'];
+ const blocked=['/.env','/.env.local','/.git/config','/.openai/hosting.json','/README.md','/package.json','/server.mjs','/tests/example-backup.json','/capital-duo-desktop.png','/dist/index.html','/../README.md','/%2e%2e/README.md','/..%2f..%2fWindows/win.ini','/%2e%2e%5c..%5cWindows%5cwin.ini','/C:/Windows/win.ini','/app.js/../../.git/config','/__proto__','/constructor','/toString','/api','/api/movements','/api/export','/admin','/debug','/json/version','/@vite/client','/__vite_ping','/node_modules','/runtime.js.map','/backup.json','/src/scene.ts','/scene.ts','/src/app.js','/src/ledger.js','/node_modules/three/build/three.module.js','/scene.js.map','/scripts/build.mjs','/package-lock.json',
+  '/app.js;.env','/.%2e/.env','/%252e%252e%252f.env','/%00.env','/%ef%bc%8eenv','/App.js','/APP.JS','/index.html::$DATA','/index.html%3a%3a$DATA','/style.css/','/favicon.ico','/security-test-output/','/.preview-dist/runtime.js'];
  for(const path of blocked){const response=await request(path);assert.equal(response.status,404,path);assert.equal(response.body,'No encontrado.');}
 });
 test('Host y origen son estrictos, sin confiar en encabezados de proxy',async()=>{
@@ -51,6 +52,11 @@ test('Host y origen son estrictos, sin confiar en encabezados de proxy',async()=
  assert.equal((await request('/',{headers:{Host:`localhost:${port}`}})).status,200);
  assert.equal((await request('/',{headers:{Host:'attacker.invalid','X-Forwarded-Host':`localhost:${port}`}})).status,421);
  assert.equal((await request('/',{headers:{'X-Forwarded-Host':'attacker.invalid','X-Forwarded-Port':'22'}})).status,200,'forwarded values never expand asset or port access');
+ const runtime=await request('/runtime.js');
+ for(const headers of [{'Forwarded':'host=attacker.invalid;proto=https'},{'X-Original-URL':'/.env'},{'X-Rewrite-URL':'/.env'},{'X-Forwarded-Proto':'http','X-Forwarded-Port':'22'}]){
+  const response=await request('/runtime.js',{headers});assert.equal(response.status,200);assert.equal(response.body,runtime.body,'proxy metadata cannot change the requested asset');
+  assert.equal((await request('/.env',{headers})).status,404,'proxy metadata cannot authorize a blocked path');
+ }
  assert.equal((await request('/',{headers:{Origin:'https://attacker.invalid'}})).status,403);
  assert.equal((await request('/',{headers:{'Sec-Fetch-Site':'cross-site'}})).status,403);
  const duplicate=await rawRequest(`GET / HTTP/1.1\r\nHost: localhost:${port}\r\nHost: attacker.invalid\r\nConnection: close\r\n\r\n`);assert.match(duplicate,/HTTP\/1\.1 (400|421)/);
@@ -72,6 +78,14 @@ test('métodos de escritura, cuerpos, CORS y WebSocket no están disponibles',as
  const body=await rawRequest(`GET / HTTP/1.1\r\nHost: localhost:${port}\r\nContent-Length: 1\r\nConnection: close\r\n\r\nx`);assert.match(body,/HTTP\/1\.1 400/);
  const connect=await rawRequest(`CONNECT localhost:22 HTTP/1.1\r\nHost: localhost:${port}\r\nConnection: close\r\n\r\n`);assert.equal(connect.includes('200 Connection'),false,'no HTTP proxy to other ports');
 });
+test('el parser limita encabezados y rechaza cuerpos chunked o framing ambiguo',async()=>{
+ const oversized=await rawRequest(`GET / HTTP/1.1\r\nHost: localhost:${port}\r\nX-Test: ${'x'.repeat(8500)}\r\nConnection: close\r\n\r\n`);assert.match(oversized,/HTTP\/1\.1 431/);
+ const chunked=await rawRequest(`GET / HTTP/1.1\r\nHost: localhost:${port}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n0\r\n\r\n`);assert.match(chunked,/HTTP\/1\.1 400/);
+ const ambiguous=await rawRequest(`GET / HTTP/1.1\r\nHost: localhost:${port}\r\nTransfer-Encoding: chunked\r\nContent-Length: 0\r\nConnection: close\r\n\r\n0\r\n\r\n`);assert.match(ambiguous,/HTTP\/1\.1 400/);
+ const absolute=await rawRequest(`GET http://127.0.0.1:22/ HTTP/1.1\r\nHost: localhost:${port}\r\nConnection: close\r\n\r\n`);assert.match(absolute,/HTTP\/1\.1 400/);
+ assert.equal((await request('/')).status,200,'the local server remains available after rejected requests');
+});
+
 test('encabezados bloquean enmarcado, conexiones y permisos innecesarios',async()=>{
  for(const path of ['/','/app.js','/scene.js','/.env']){
   const response=await request(path),h=response.headers;

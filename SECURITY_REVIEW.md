@@ -1,58 +1,54 @@
-# Capital Dúo · Revisión local de seguridad
+# Capital Dúo · Revisión de seguridad posterior al rediseño 3D
 
-20 de octubre de 2026. Alcance: este proyecto y sus servidores loopback. No se abrió ningún túnel, no se publicó y no se probaron sistemas externos. No se accedió al almacenamiento real del navegador; las pruebas usaron memoria ficticia y el puerto aislado 4174.
+20 de octubre de 2026. Revisión del proyecto actual y sus servicios locales. No se abrió ningún túnel ni se publicó la aplicación. No se leyó ni modificó el almacenamiento real del navegador. Las sondas se limitaron a estos servidores y a servidores efímeros del propio proyecto; npm audit solo consultó avisos de dependencias, sin pruebas sobre sistemas externos.
 
-## Superficie revisada
+## Superficie que se expondría
 
-- Frontend estático: 13 recursos explícitos en `PUBLIC_FILES`, incluidos los módulos locales de presentación/almacenamiento y `scene.js`, que empaqueta Three.js. No se usa CDN. No hay API, usuarios/sesiones de servidor, rutas administrativas, base de datos, WebSocket, telemetría ni conexiones externas del frontend.
-- Servidor local 4173: aplicación personal. Se reemplazó el servidor anterior por uno estático endurecido, manteniendo origen y claves de datos existentes.
-- Vista previa 4174: exclusivamente `.preview-dist`, 13 recursos conocidos precargados en memoria. El límite por recurso es 256.000 bytes, con una excepción de 1.500.000 bytes exclusivamente para el bundle `scene.js`. `runtime.js` exige demostración y un libro independiente; no permite alternar a reales. Los visitantes no reciben el almacenamiento del dueño ni un libro compartido. Las fuentes `src/`, TypeScript, mapas de fuentes y `node_modules/` no forman parte del acceso público.
-- Código/configuración/archivos ocultos: sin `.env`, claves privadas ni credenciales encontradas en los archivos revisados. Las capturas existentes contienen demostración; respaldos de pruebas y metadatos de hosting quedan fuera de los recursos públicos. La búsqueda de patrones no constituye una garantía de ausencia de secretos.
-- La revisión inicial registró cero dependencias npm. El nuevo build declara Three.js 0.186.1 y herramientas de desarrollo esbuild 0.28.2, TypeScript 5.9.3 y tipos de Three.js 0.186.0; las versiones están fijadas y existe lockfile. Node local registrado: v22.22.2. No se consultaron registros ni bases externas de CVE en esta revisión local; las vulnerabilidades actuales de esas versiones y del runtime quedan sin verificar.
+- Frontend estático: exactamente trece recursos permitidos, precargados en memoria. Incluyen HTML, CSS, módulos locales y Three.js empaquetado en scene.js; sin CDN, fuentes remotas, telemetría o conexiones externas del frontend. CSP mantiene connect-src 'none'.
+- Puerto 4173: aplicación personal, ligada exclusivamente a 127.0.0.1. Aunque el comando se llama dev, sirve la compilación estática; no hay HMR ni servidor de desarrollo expuesto.
+- Puerto 4174: vista previa aislada, ligada exclusivamente a 127.0.0.1, con artefactos de .preview-dist y PREVIEW_ONLY=true obligatorio. Usa capital-duo.preview.v1; no lee los libros real/demo del servicio personal. Cada visitante tendría datos en su propio navegador, sin acceso a los registros del dueño.
+- No existen API, base de datos, administración remota, usuarios/sesiones de servidor, WebSocket, proxy ni endpoints de escritura. La aplicación no ejecuta comandos recibidos por HTTP. Los comandos de compilación/verificación son locales y usan argumentos controlados por el proyecto.
+- No se sirven la raíz del proyecto, .env, .git, metadatos de hosting, fuentes, mapas, node_modules, documentación o respaldos. No se encontraron .env, claves privadas ni credenciales en los archivos propios revisados. Los nombres Fran/Yane y los ejemplos son contenido intencional de la aplicación; los registros reales no forman parte del build.
+- No hay autenticación ni contabilidad compartida. Las validaciones cliente mantienen coherencia local; no constituyen autorización de servidor. Una futura versión compartida necesitaría otra arquitectura de autenticación y transacciones.
 
-## Hallazgos y correcciones
+## Hallazgos de esta revisión y correcciones
 
-| Hallazgo | Gravedad en el contexto previsto | Corrección y evidencia |
+| Hallazgo | Gravedad | Corrección y comprobación |
 | --- | --- | --- |
-| Host sin validación en el servidor anterior | Media al exponerlo | Solo loopback:puerto exacto, rechaza Host ausente/duplicado/ajeno; ignora encabezados de proxy. Pruebas HTTP locales. |
-| URL malformada podía lanzar una excepción fuera del manejador | Media, disponibilidad | Se eliminó el parseo URL de entradas HTTP. Rutas literales en Map, errores controlados. Solicitudes malformadas devuelven 400 y el servicio sigue respondiendo. El fallo anterior se identificó por código; no se derribó el servicio original para demostrarlo. |
-| No existía una entrada obligatoriamente aislada de demostración | Media, configuración | Otro puerto, artefacto estático y namespace `capital-duo.preview.v1`; sin lecturas de libros reales/demo normales, sin botón ni acción de cambio. No se confirmó una fuga remota de datos reales en la versión anterior. |
-| Dos pestañas podían perder una escritura simultánea | Media, integridad | Web Locks exclusivo por libro, comparación de versión dentro del bloqueo, rechazo del segundo envío y del cambio de modo mientras guarda. Falla cerrada sin soporte del navegador. |
-| Cambio de modo durante lectura asíncrona de un respaldo | Baja | Captura modo/versión antes de leer y cancela al detectar cambios. Regresión con promesa diferida y cero escrituras. |
-| Límite de respaldo medía caracteres, no bytes | Baja | Máximo 5.000.000 bytes UTF-8 al importar y antes de guardar. Se rechaza el ejemplo multibyte de más de 9 MB que antes pasaba esa capa; el selector de archivos ya controlaba bytes. Exportación JSON compacta para conservar el mismo límite al recuperar el respaldo. |
-| Fecha imposible aceptada en la bitácora por normalización de Date.parse | Baja | Fecha y hora ISO reales, manteniendo timestamps válidos de los respaldos anteriores. |
-| Faltaban restricciones de enmarcado y conexiones innecesarias | Baja, defensa adicional | CSP por encabezado con frame-ancestors/connect-src none; DENY, nosniff, no-referrer, permisos restringidos y no-store. |
+| Inicializar una demostración nueva escribía sin bloqueo. Una pestaña lenta podía sobrescribir un cambio de otra pestaña durante esa primera carga. | Baja; integridad de demo/preview. La carga de registros reales no realizaba esa escritura. | src/storage.js ya no escribe al cargar. El ejemplo queda en memoria; el primer movimiento persiste bajo Web Locks y comparación de versión. Tres regresiones prueban inicio/recarga, conservación del libro concurrente y lectura sin sobrescrituras. |
+| El getter localStorage se evaluaba fuera del try del lector. Si el navegador denegaba ese acceso, el arranque abortaba. | Baja; disponibilidad local. | src/app.js obtiene el almacenamiento dentro de try. Ante denegación muestra alerta e interfaz restringida, bloquea guardados y no toca datos previos. Regresión con getter denegado y cero lecturas/escrituras del libro original. |
 
-No se encontró XSS ejecutable, inyección de comandos, recorrido de directorios ni endpoints administrativos expuestos en las comprobaciones realizadas. No se detectaron hallazgos graves/críticos confirmados dentro de este alcance local.
+Ambos casos se reprodujeron con almacenamiento ficticio, sin afectar datos reales. No se modificaron las fórmulas, el esquema de respaldos, las claves existentes ni las dependencias. No quedaron hallazgos graves o críticos confirmados en este alcance.
 
-## Pruebas posteriores
+Los controles de la revisión anterior siguen comprobados: Host/origen estrictos, rutas literales, aislamiento de demo, Web Locks al guardar, límite UTF-8, fechas reales, CSP/anti-framing y rechazo de entradas inválidas. No se presentan como vulnerabilidades nuevas.
 
-Resultados registrados de la revisión inicial, anteriores al nuevo build 3D: `npm test`, **34/34 aprobadas**; `npm run check`, aprobado. No se extrapolan esos resultados a los cambios posteriores. Las pruebas HTTP crean servidores efímeros exclusivamente en 127.0.0.1 y los cierran al terminar.
+## Pruebas posteriores y resultados
 
-- Rutas denegadas: `.env`, `.git/config`, metadatos de hosting, código servidor, README, respaldos, capturas, traversal literal/codificado, propiedades heredadas, `/api`, `/admin`, depuración y rutas típicas de servidores de desarrollo.
-- Host inválido/duplicado/ausente, origen ajeno, Fetch Metadata cross-site, métodos POST/PUT/PATCH/DELETE/OPTIONS, cuerpo GET, WebSocket y CONNECT a otro puerto: sin acceso. GET/HEAD y assets permitidos siguen funcionando. Se verificaron bind, límites y encabezados.
-- JSON con tipos/montos/fechas inválidos, claves inesperadas, `__proto__`, 20.000 niveles de anidamiento, Unicode sobredimensionado y referencias manipuladas: rechazado sin modificar registros.
-- En navegador real, solo en 4174: descripción de formulario y respaldo con `</textarea>`, `<img onerror>`, `<svg onload>`, IDs con ruptura de atributo y motivos maliciosos. Cero nodos ejecutables insertados y cero diálogos de script; el texto se conserva escapado en historial, detalle y respaldo previo.
-- También se rechazó en la interfaz el JSON con `__proto__`, conservando el capital $215. Al terminar se importó una demostración limpia con el ejemplo obligatorio, dejando $214 y pendientes $3/$3; no quedan payloads de auditoría en la vista previa entregada.
-- Ejemplo obligatorio tras importar: capital Fran $12 / Yane $202, pendiente $3 por persona. Retirar $4 se bloquea; retirar $3 deja el capital total $214 intacto. Recarga conserva el resultado. Tras el cambio a Web Locks, venta de $5 y costo $0 produce reinversión $1, ganancias $4, repartos conservados y guardado correcto.
-- Pruebas del motor cubren aportes desiguales, ventas, 20% de la venta, reinversión, retiros, redondeos, déficits, correcciones/anulaciones, persistencia y respaldos. Pruebas con locks ficticios verifican serialización y conservación ante fallos de espacio. No se afirma haber hecho una prueba real de estrés entre múltiples navegadores.
-
-### Comprobación acotada del nuevo build 3D
-
-Se ejecutó `node --test tests/http-security.test.mjs` sobre el build disponible: **8/8 aprobadas**. Se verificaron los 13 recursos exactos y sus límites de tamaño, el tipo JavaScript y la igualdad del bundle servido con `dist/scene.js`; `src/scene.ts`, fuentes del controlador/motor, mapas, herramientas de build y la ruta de Three.js en `node_modules` devolvieron 404. Se mantuvieron las comprobaciones de Host/origen, CSP sin conexiones, ausencia de API, métodos de escritura y protocolos adicionales. Esta comprobación HTTP no vuelve a validar por sí sola la interfaz 3D en navegador ni consulta vulnerabilidades externas. No se abrió túnel ni se publicaron recursos.
+- npm test: **53/53 aprobadas**, con compilación previa. npm run typecheck y npm run check: aprobados. git diff --check: sin errores.
+- npm audit --json: **0 vulnerabilidades conocidas informadas** para las versiones del lockfile consultadas. No se instalaron actualizaciones ni se usaron correcciones forzadas. Runtime local identificado: Node v22.22.2; npm audit no certifica el runtime.
+- Nueve pruebas HTTP: trece recursos exactos y tamaños; .env, .git, hosting, servidor, fuentes, dependencias, respaldos, API/admin/debug, traversal simple/doble/codificado, variantes de Windows/ADS/case y mapas inaccesibles. GET/HEAD siguen funcionando; métodos de escritura, WebSocket y CONNECT no habilitan acceso. Las cadenas de destino ajeno se enviaron únicamente al servidor del proyecto, sin conectarse a esos destinos.
+- Host ausente/duplicado/ajeno, origen ajeno y Fetch Metadata cross-site se rechazan. Cuatro variantes de encabezados de proxy no amplían rutas ni puertos. Encabezados excesivos reciben 431; chunked, framing ambiguo y destinos absolutos reciben 400. El servidor sigue respondiendo después.
+- Verificación sobre los servicios realmente abiertos: solo 127.0.0.1:4173 y 127.0.0.1:4174. En ambos, trece rutas sensibles dan 404, Host inválido 421 y origen ajeno 403; los módulos servidos coinciden con las fuentes corregidas. El runtime del 4174 fuerza demo y el del 4173 conserva la aplicación personal.
+- Navegador, exclusivamente en 4174: descripción de formulario con cierre de textarea, imagen con onerror y SVG con onload. Historial, detalle, exportación y copia previa a importar mantienen el contenido como texto: cero nodos ejecutables y cero diálogos de script observados.
+- Respaldo de prueba con ID que intenta romper un atributo, descripción y motivo maliciosos: importación validada y texto escapado; el ID conserva su valor sin crear marcado. JSON con __proto__ se rechaza y, tras recarga, los saldos permanecen intactos.
+- Contabilidad/persistencia: aporte de prueba, venta V=20/C=10 (reinversión 4, ganancia 6), doble toque con un único registro, replay/skip sin otra venta, recarga, retiro válido y sobrerretiro bloqueado, deshacer y déficit bloqueado. Las pruebas del motor también cubren aportes desiguales, redondeos, correcciones/anulaciones y respaldos de ida y vuelta.
+- Al terminar se importó demostración limpia: tres movimientos del ejemplo, capital Fran $12 / Yane $202 / total $214 y pendientes $3/$3. No quedan payloads de auditoría en la demostración entregada.
+- Cierre real comprobado: se detuvo la vista previa y 4174 rechazó conexiones; después se reinició únicamente su servidor local aislado.
 
 ## Exposición futura y cierre
 
-`npm run preview` prepara e inicia únicamente `http://127.0.0.1:4174`. El futuro túnel debe dirigir un solo hostname HTTPS a ese destino, conservando Host de upstream `127.0.0.1:4174`. Nunca debe apuntar al 4173, a la raíz del proyecto ni permitir TCP arbitrario, otros puertos o interfaces de inspección públicas.
+La vista previa queda preparada en http://127.0.0.1:4174. Para repetir: npm run preview. Solo sirve los trece recursos permitidos de .preview-dist, con límite de 256 KB por recurso salvo scene.js, limitado expresamente a 1,5 MB. No se amplió ningún control global.
 
-Cuando se conozca el enlace, `CAPITAL_DUO_PREVIEW_ORIGIN` puede declarar su único origen HTTPS exacto para las solicitudes de módulos. Por defecto no está configurado. La validación rechaza comodines, rutas, listas, credenciales y puertos adicionales; no amplía Host, bind, CORS ni destinos. Se probaron estos rechazos y el origen exacto mediante encabezados locales, sin resolver ni visitar dominios externos.
+El futuro túnel debe dirigir un único hostname HTTPS exclusivamente a http://127.0.0.1:4174 y conservar Host de upstream 127.0.0.1:4174. No debe apuntar al 4173, al sistema de archivos, a un proxy, a otros puertos ni a una interfaz pública de depuración. CAPITAL_DUO_PREVIEW_ORIGIN permite un solo origen HTTPS exacto cuando se conozca; se prueban localmente sus rechazos de comodines, listas, rutas, credenciales y puertos adicionales. No abre el túnel ni habilita CORS.
 
-**La configuración concreta del proveedor del túnel, su TLS, acceso/autenticación y reglas de ingreso aún no se han comprobado. El acceso externo queda pendiente de esa revisión en el paso posterior.** No se deben desactivar los controles de este servidor para hacerlo funcionar.
+**La configuración ejecutable del proveedor de túnel, su TLS y su control de acceso no están disponibles y no se han verificado. El acceso externo queda pendiente de ese paso; no se considera validado por estas pruebas locales.** La política vigente rechaza navegaciones cross-site; introducir la dirección directamente evita esa condición sin relajar controles.
 
-Para cerrar: detener primero el proceso del túnel cuando exista y luego Ctrl+C en la terminal de `npm run preview`. El manejador cierra conexiones y servidor. Verificar que el puerto 4174 ya no esté en LISTENING. No es necesario borrar datos del navegador ni modificar controles globales. Reiniciar la vista previa requiere volver a ejecutar el comando.
+Para cerrar un futuro acceso: detener primero el túnel y después Ctrl+C en npm run preview; verificar que 4174 deja de escuchar. No es necesario borrar registros, alterar seguridad global ni detener servicios ajenos. El cierre de 4174 sí se comprobó en esta revisión.
 
-## Límites y archivos
+## Limitaciones y riesgos pendientes
 
-Los datos locales y respaldos no están cifrados por la aplicación; la bitácora no garantiza autenticidad frente al dueño del dispositivo. No hay autenticación de una contabilidad compartida. Navegadores sin Web Locks pueden consultar/exportar pero no guardar. No se verificaron Safari/iPhone físico, volumen adversarial de tráfico, vulnerabilidades actuales del runtime ni protección del futuro proveedor. La descarga por la API del navegador integrado no quedó confirmada; sí su serialización, importación y alternativa de copia completa.
+Los datos locales y respaldos no tienen cifrado de aplicación. Una persona o extensión con acceso al perfil del navegador puede leerlos o alterarlos; la bitácora no prueba autenticidad contra el dueño del dispositivo. No hay cuentas ni sincronización. La vista previa es para datos de demostración.
 
-La revisión inicial cambió el servidor, configuración, recursos estáticos, scripts, pruebas y documentación, sin añadir dependencias ni migrar/eliminar registros reales. La actualización 3D separa fuentes en `src/` y genera `dist/`; sus dependencias añadidas y la comprobación HTTP acotada se detallan arriba. La preparación de la vista previa copia únicamente la lista pública explícita.
+La consulta npm no cubre vulnerabilidades desconocidas, todos los problemas del runtime/OS o del futuro proveedor. No hubo revisión de CVE de Node fuera de npm, pentest externo, pruebas de carga/agotamiento, Safari/iPhone físico ni estrés de múltiples navegadores reales. La serialización, copia e importación JSON están verificadas; la API del navegador no confirmó un archivo descargado, por lo que esa descarga no se da por comprobada.
+
+Archivos modificados en esta revisión: src/app.js, src/storage.js, pruebas de seguridad cliente/HTTP y nuevo tests/storage-security.test.mjs; documentación de seguridad, validación y almacenamiento. Reversión de código mediante Git, sin migrar ni eliminar registros del navegador. Esta revisión reduce riesgos comprobados; no garantiza seguridad total.

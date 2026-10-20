@@ -29,8 +29,15 @@ const player=createSalePlayer({
 });
 
 function load(){
- ({raw,book,state,loadError,storageBlocked}=readBook(localStorage,key(),demo,()=>createDemoBook(event)));
- ({lite,motion,mode}=readSettings(localStorage,preferenceKey));
+ try{
+  const storage=localStorage;
+  ({raw,book,state,loadError,storageBlocked}=readBook(storage,key(),demo,()=>createDemoBook(event)));
+  ({lite,motion,mode}=readSettings(storage,preferenceKey));
+ }catch{
+  raw=null;book=emptyBook();state=replay(book);storageBlocked=true;
+  loadError='El navegador bloqueó el acceso al almacenamiento local. Tus registros existentes no se leerán ni modificarán. Habilita el almacenamiento de este sitio y recarga para recuperar o exportar tus respaldos.';
+  lite=false;motion=true;mode='calm';
+ }
 }
 async function commit(next){
  if(storageBlocked)throw new Error('El almacenamiento no está disponible. Exporta tus registros antes de continuar.');

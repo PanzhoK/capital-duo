@@ -27,6 +27,8 @@ export async function createWorld(host: HTMLElement, initialOptions: WorldOption
   let effectStart = 0;
   let effectStep = -1;
   let lastFrame = 0;
+  let renderWidth = 0;
+  let renderHeight = 0;
   const smallScreen = matchMedia('(max-width: 650px)');
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, smallScreen.matches ? 1.5 : 1.75));
@@ -317,12 +319,17 @@ export async function createWorld(host: HTMLElement, initialOptions: WorldOption
     if (disposed) return;
     const width = Math.max(1, host.clientWidth);
     const height = Math.max(1, host.clientHeight);
+    if (width === renderWidth && height === renderHeight) return;
+    renderWidth = width;
+    renderHeight = height;
     const aspect = width / height;
     const halfWidth = aspect < 1.1 ? 8.75 : Math.max(8.2, 5.5 * aspect);
     camera.left = -halfWidth; camera.right = halfWidth;
     camera.top = halfWidth / aspect; camera.bottom = -halfWidth / aspect;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
+    // Resizing clears WebGL. Paint immediately, even before the next observer/RAF.
+    renderer.render(scene, camera);
     render();
   }
   function stopEffects() {

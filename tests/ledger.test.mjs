@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {emptyBook,append,replay,saleBreakdown,parseBackup,saveBook,MAX_AMOUNT} from '../dist/ledger.js';
+import {emptyBook,append,replay,saleBreakdown,parseBackup,saveBook,MAX_AMOUNT} from '../src/ledger.js';
 let i=0;
 const op=(kind,person,amount,cost=0,date='2026-10-19')=>({kind,person,amount,cost,date,description:'Movimiento '+(++i)});
 const event=(operation,action='create',target=null,reason='')=>({id:'event-'+(++i),target,action,at:'2026-10-19T12:00:00.000Z',reason,operation});

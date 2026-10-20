@@ -1,14 +1,16 @@
 # Capital Dúo
 
-Aplicación funcional para el capital y las ganancias de Fran y Yane. Proyecto nuevo: la carpeta original estaba vacía. No se recuperaron registros anteriores.
+Aplicación local para el capital y las ganancias de Fran y Yane, presentada como una isla de gestión 3D. Este rediseño conserva el libro, sus claves de almacenamiento, su formato de respaldo y las reglas financieras existentes. La entrega inicial comenzó sin registros previos; la aplicación no puede recuperarlos automáticamente.
 
 ## Abrir localmente
 
-Requiere Node.js 22 o posterior. Desde esta carpeta, ejecutar `npm run dev` y abrir http://localhost:4173. No abrir `index.html` con `file://`: los módulos necesitan HTTP. No requiere instalar dependencias. `npm test` ejecuta las pruebas contables y de seguridad; `npm run check` verifica sintaxis. El navegador necesita Web Locks para guardar de forma segura entre pestañas; si no lo admite, se permite consultar/exportar y se rechaza el guardado sin modificar registros.
+Requiere Node.js 22 o posterior. Desde esta carpeta, instalar con `npm ci --ignore-scripts` y ejecutar `npm run dev`; abrir http://localhost:4173. El comando compila y sirve exclusivamente los recursos permitidos de `dist/`, en loopback; no inicia un servidor de desarrollo ni abre un túnel. No abrir `index.html` con `file://`: los módulos necesitan HTTP. Detener con Ctrl+C.
+
+`npm run build` genera `dist/`; `npm test` compila y ejecuta las pruebas contables, de reproducción y seguridad; `npm run check` comprueba sintaxis JavaScript; `npm run typecheck` comprueba la escena TypeScript. El navegador necesita Web Locks para guardar de forma segura entre pestañas; si no lo admite, se permite consultar/exportar y se rechaza el guardado sin modificar registros.
 
 ## Vista previa aislada
 
-Ejecutar `npm run preview`. Prepara `.preview-dist/` copiando únicamente cinco archivos estáticos y arranca http://127.0.0.1:4174. Este modo fuerza demostración y usa `capital-duo.preview.v1`; nunca lee los libros real/demo normales. No copia respaldos, `.env`, `.git`, documentación, capturas ni archivos del equipo. No abre túneles ni publica. Detener con Ctrl+C.
+Ejecutar `npm run preview`. Compila y prepara `.preview-dist/` copiando únicamente los trece recursos estáticos de la lista permitida; arranca http://127.0.0.1:4174. Este modo fuerza demostración y usa `capital-duo.preview.v1`; nunca lee los libros real/demo normales. No copia respaldos, `.env`, `.git`, documentación, capturas, fuentes TypeScript, dependencias instaladas ni archivos del equipo. No abre túneles ni publica. Detener con Ctrl+C.
 
 `npm run build:preview` solo prepara esos archivos. El servidor conserva en memoria una lista exacta de recursos; no hay API, proxy, ejecución de comandos ni lectura de rutas solicitadas por el visitante. Solo acepta GET/HEAD, Host loopback con puerto exacto y solicitudes de origen permitido. Rechaza WebSocket, métodos de escritura, enmarcado y conexiones del frontend.
 
@@ -33,9 +35,15 @@ Cada registro es un evento; correcciones y anulaciones agregan eventos con fecha
 
 Importaciones: validación estricta de esquema v1, máximo 5.000.000 bytes UTF-8 / 5.000 eventos, tipos, fechas reales, referencias y reglas contables. Reemplazo explícito después de ofrecer descarga de los datos actuales. No mezcla registros automáticamente. Datos corruptos no se sobrescriben: se ofrece descarga para recuperación. El guardado usa Web Locks por libro y compara la versión anterior dentro del bloqueo: una segunda pestaña con datos desactualizados se rechaza. No cambia de modo ni admite un segundo envío durante un guardado. Si el modo o el libro cambia mientras se lee un respaldo, se cancela la importación. Para compartir registros entre usuarios o dispositivos sigue siendo necesario un backend autenticado con transacciones.
 
-## Interfaz y seguridad
+## Interfaz, estructura y seguridad
 
-Escenario isométrico SVG nativo, animaciones CSS, sin librerías, fuentes remotas ni servicios externos. Soporta `prefers-reduced-motion`, pausa manual y modo liviano. Formularios legibles, modales nativos, enfoque de teclado y navegación móvil. El contenido externo se valida y escapa antes de presentarse; sin evaluación dinámica. CSP restringe scripts al mismo origen y bloquea conexiones; el servidor agrega `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, política de permisos y `no-store`. Los estilos inline permanecen habilitados para geometría/animación de valores controlados por la aplicación; no se acepta CSS del usuario.
+Three.js dibuja geometría real local: isla, negocio central, bóvedas, monedas y árboles. El renderizado se detiene en reposo, fuera de pantalla y al ocultar la pestaña. Los efectos limitan su frecuencia y resolución; no hay texturas, fuentes remotas, telemetría ni servicios externos. La escena se carga bajo demanda. Si WebGL falla se activa explícitamente la vista liviana; formularios, saldos y navegación permanecen fuera del lienzo. Se respetan movimiento reducido y pausa manual. Tranquilo es el ambiente inicial y Fiesta añade partículas breves; el sonido requiere activación explícita y empieza apagado en cada visita.
+
+La venta se persiste antes de animarse. Saltar o repetir solo reproduce una copia inmutable del resultado contable; nunca vuelve a guardar. Los importes y sus mitades proceden del único motor financiero, incluidos los turnos de redondeo. Deshacer agrega una anulación trazable y se bloquea si deja movimientos posteriores sin fondos.
+
+`src/ledger.js` centraliza contabilidad y validación; `storage.js` conserva las claves y lectura segura; `app.js` coordina formularios/guardado; `animation.js` reproduce resultados sin escrituras; `game-ui.js` y `views.js` presentan los datos; `scene.ts` se ocupa únicamente del mundo 3D. `scripts/build.mjs` empaqueta Three en un único módulo local con esbuild. Versiones fijadas y lockfile versionado; `dist/`, `.preview-dist/` y `node_modules/` se generan y están excluidos de Git. Se retiraron la escena SVG, las tarjetas principales y el recibo anterior; no hay pantallas paralelas ocultas.
+
+El contenido externo se valida y escapa antes de presentarse; sin evaluación dinámica. CSP restringe scripts al mismo origen y bloquea conexiones; el servidor agrega `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, política de permisos y `no-store`. Se mantiene el límite de 256 KB por recurso salvo `scene.js`, limitado expresamente a 1,5 MB por incluir Three; no amplía rutas ni acceso a archivos. Los estilos inline permanecen habilitados para geometría/animación de valores controlados por la aplicación; no se acepta CSS del usuario.
 
 ## Límites
 

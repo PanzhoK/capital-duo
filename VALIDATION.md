@@ -1,31 +1,44 @@
-# Verificación de Capital Dúo
+# Verificación del rediseño 3D · Capital Dúo
 
-La auditoría local posterior del 20 de octubre de 2026 se documenta en [SECURITY_REVIEW.md](SECURITY_REVIEW.md): 34 pruebas aprobadas, servidor endurecido, guardado con Web Locks y vista previa obligatoriamente de demostración. Los resultados siguientes corresponden a la entrega inicial.
+Revisión local del 20 de octubre de 2026. No se abrió ningún túnel ni se publicó la aplicación. Las pruebas de navegador se realizaron exclusivamente en `http://127.0.0.1:4174`, con demostración forzada y almacenamiento independiente. No se modificaron los registros reales de `localhost:4173`.
 
-## Resultado
+## Pruebas automatizadas
 
-11 pruebas Node pasan. Sintaxis de `app.js` y `ledger.js` validada con `node --check`. Sin dependencias de ejecución o instalación.
+- `npm test`: **48/48 aprobadas**, con compilación previa. Contabilidad, persistencia, seguridad del cliente/servidor y reproducción de ventas.
+- `npm run typecheck`: sin errores en la escena TypeScript.
+- `npm run check`: sintaxis JavaScript comprobada.
+- `npm audit --json`: cero vulnerabilidades conocidas informadas por npm en las versiones del lockfile consultado. Esto no cubre vulnerabilidades desconocidas ni el sistema operativo/runtime.
+- Comparación contra el checkpoint Git `880fd7a`: `src/ledger.js` conserva íntegro el motor financiero anterior.
 
-Cobertura: ejemplo obligatorio ($14 y luego $214, pendientes $3/$3), aportes desiguales, costo no duplicado, retiros sin alterar capital, sobrerretiro, costo financiado exclusivamente por capital, déficit bloqueado, ganancia cero, redondeo para 5.000 valores, alternancia de pesos impares, correcciones/anulaciones/restauraciones, orden por fecha, referencias y fechas inválidas, respaldo ida y vuelta, almacenamiento fallido y cambio concurrente de pestaña. Se verificó acumulación entera hasta el límite de 5.000 eventos.
+Cobertura contable: ejemplo obligatorio ($14 y después $214, pendientes $3/$3), aportes desiguales, costo recuperado no duplicado, 20% de la venta, retiros sin reducir capital, fondos insuficientes, déficit bloqueado, ganancia cero, redondeo entero y conservación para miles de valores, turnos independientes de pesos impares, correcciones/anulaciones/restauraciones y orden retroactivo.
+
+Cobertura de guardado/reproducción: bloqueo entre pestañas y comparación de versión, fallos de espacio, separación real/demo/preview, importaciones que cambian de libro durante su lectura, snapshots inmutables, doble confirmación, replay/skip sin escrituras, cancelación de callbacks obsoletos, reproducción reentrante y movimiento reducido sin temporizadores. Un fallo de presentación posterior al guardado mantiene la venta y no permite reenviarla desde el formulario cerrado.
+
+Seguridad: entradas XSS permanecen escapadas en historial, detalles, atributos y respaldos; JSON con campos inesperados, tipos/montos manipulados, propiedades de prototipo, fechas/referencias inválidas o exceso de bytes/eventos se rechaza sin escribir. HTTP prueba los trece recursos exactos y el bundle local de Three; archivos sensibles, rutas administrativas, fuentes, dependencias, mapas y recorrido de directorios no están disponibles. Se conservan Host/origen estrictos, CSP sin conexiones, solo GET/HEAD y rechazo de WebSocket/CORS de escritura. Detalle y límites en [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
 
 ## Navegador
 
-Probado en el navegador integrado de Codex con vistas 1440×1000 y 390×844. La vista móvil no desborda horizontalmente. No equivale a una prueba en un iPhone físico o Safari.
+Navegador integrado de Codex en 1440×1000, 650×900, 390×844 y 375×812. WebGL activo, un lienzo 3D y sin desborde horizontal en las vistas móviles comprobadas. La escena real muestra isla, negocio y dos bóvedas con volumen. Se ajustaron tamaño/contraste de texto y separación entre controles/saldos; las acciones móviles siguen el flujo de la página para no tapar cifras.
 
-Flujos comprobados desde formularios: aporte, venta con costo y reparto previo, aporte desigual, persistencia después de recargar, corrección trazable, bloqueo de sobrerretiro, retiro válido, bloqueo explícito de déficit, recibo animado de la venta, cambio a demo e importación de un archivo JSON con confirmación. La importación del ejemplo muestra y guarda capital Fran $12 / Yane $202 y pendientes $3/$3. Los datos de prueba se usaron en el origen `127.0.0.1`, separados del origen de entrega `localhost`.
+Flujos comprobados con datos de prueba:
 
-La API de automatización del navegador integrado no confirmó el evento de descarga. La aplicación ofrece descarga estándar y una alternativa de copia íntegra del JSON para navegadores que la bloqueen. La serialización y recuperación de respaldos sí están comprobadas; no se afirma haber verificado un archivo descargado por esa API.
+- Venta de $20 con costo $10: previa de $4 de reinversión y $6 de ganancia; doble toque genera un solo registro. La animación muestra los importes guardados y sus mitades; repetir y saltar mantienen el mismo número de movimientos.
+- Recarga conserva capital y pendientes. Bóveda pulsada en el lienzo abre el detalle correcto; el botón HTML equivalente también funciona.
+- Sobrerretiro bloqueado; retiro de $2 reduce solo pendientes. Deshacer agrega anulación y recupera el saldo sin alterar capital.
+- Venta con déficit muestra la causa y mantiene la confirmación deshabilitada.
+- Vista liviana elimina el lienzo y permite volver a 3D. Con movimiento pausado, venta de $5/costo $0 muestra inmediatamente todos los pasos: reinversión $1 repartida $1/$0 y ganancia $4 repartida $2/$2; deshacer conserva la bitácora.
+- Importación del respaldo del ejemplo con revisión de totales y respaldo previo; tras recarga, Fran $12 / Yane $202 / total $214, pendientes $3 por persona.
 
-## Revisión de seguridad
+La serialización, copia íntegra e importación JSON están comprobadas. La API de automatización no confirmó un archivo descargado; no se afirma haber verificado esa descarga. El sonido comienza apagado y exige interacción, pero no se verificó su percepción auditiva.
 
-Esquema de importación estricto; límite 5 MB y 5.000 eventos; montos enteros, fechas reales y referencias válidas; reproducción contable antes de guardar; rechazo de operaciones que invalidan movimientos posteriores. Contenido externo escapado. Scripts del mismo origen y sin evaluación dinámica. Sin secretos, telemetría, dependencias externas ni transmisión de registros a un servidor.
+## Límites y supuestos
 
-Almacenamiento local sin cifrado de aplicación ni autenticación, apropiado para uso personal en dispositivo de confianza. La bitácora conserva originales pero no es inalterable para el propietario del navegador. La auditoría posterior agregó Web Locks para serializar escrituras del mismo libro entre pestañas; no hay sincronización entre dispositivos.
+No hubo prueba en iPhone físico, Safari, medición de FPS/batería real ni estrés de múltiples dispositivos. Se limita resolución, sombras y renderizado; esto no garantiza un rendimiento concreto en todo hardware. Movimiento reducido se comprobó en el reproductor y mediante pausa manual; no se cambió la preferencia del sistema operativo.
 
-## Entrega y publicación
+Datos en este navegador, sin cifrado de aplicación, cuentas ni sincronización. Ventas cobradas y costos financiados/recuperados dentro de la misma operación. Capital contable distinto del efectivo disponible. Los déficits siguen bloqueados porque su absorción no está acordada.
 
-Aplicación local en `http://localhost:4173`; iniciar desde esta carpeta con `npm run dev`. El sitio privado de Sites fue registrado pero no publicado en la entrega inicial. La revisión de seguridad posterior se realizó exclusivamente de forma local por instrucción del usuario, sin publicación ni túneles. La vista previa aislada se prepara con `npm run preview` en el puerto 4174; cualquier acceso externo requiere un paso posterior y revisar su configuración real.
+La vista previa sirve solo recursos compilados permitidos en loopback. La configuración concreta de un futuro proveedor de túnel, TLS y control de acceso sigue sin comprobarse; requiere otro paso. Cerrar con Ctrl+C el servidor correspondiente, y detener primero cualquier túnel si se crea posteriormente.
 
-## Supuestos
+## Limpieza y reversión
 
-CLP sin centavos. Ventas cobradas y costos financiados/recuperados dentro de la misma operación. No hay efectivo conciliado, inventario, deudas ni sincronización. El déficit no tiene una regla acordada y se bloquea. Proyecto nuevo porque no había código ni registros en la carpeta.
+Se retiraron la escena SVG, los bloques de inicio y el recibo antiguos, imports sin uso y capturas de pruebas del proyecto. Hay una única interfaz y un único cálculo financiero. Fuentes en `src/`; resultados de compilación y dependencias instaladas excluidos de Git. Se conserva el checkpoint local `880fd7a` para revisar/revertir código sin crear copias del proyecto; no contiene datos de almacenamiento del navegador.

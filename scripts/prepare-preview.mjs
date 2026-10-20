@@ -2,6 +2,7 @@ import {mkdir,readFile,writeFile,lstat,realpath} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {resolve,dirname} from 'node:path';
 import {PUBLIC_FILES} from '../server.mjs';
+import {build} from './build.mjs';
 
 const projectRoot=fileURLToPath(new URL('../',import.meta.url));
 export async function preparePreview(){
@@ -18,4 +19,4 @@ export async function preparePreview(){
  }
  return target;
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))preparePreview().then(()=>console.log('Vista previa estática preparada: .preview-dist (solo demostración).')).catch(()=>{console.error('No se pudo preparar la vista previa.');process.exitCode=1;});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))build().then(preparePreview).then(()=>console.log('Vista previa estática preparada: .preview-dist (solo demostración).')).catch(()=>{console.error('No se pudo preparar la vista previa.');process.exitCode=1;});

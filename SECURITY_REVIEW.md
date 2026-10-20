@@ -4,11 +4,11 @@
 
 ## Superficie revisada
 
-- Frontend estático: `index.html`, `app.js`, `ledger.js`, `style.css`, `runtime.js`. No hay API, usuarios/sesiones de servidor, rutas administrativas, base de datos, WebSocket, telemetría ni conexiones externas del frontend.
+- Frontend estático: 13 recursos explícitos en `PUBLIC_FILES`, incluidos los módulos locales de presentación/almacenamiento y `scene.js`, que empaqueta Three.js. No se usa CDN. No hay API, usuarios/sesiones de servidor, rutas administrativas, base de datos, WebSocket, telemetría ni conexiones externas del frontend.
 - Servidor local 4173: aplicación personal. Se reemplazó el servidor anterior por uno estático endurecido, manteniendo origen y claves de datos existentes.
-- Vista previa 4174: exclusivamente `.preview-dist`, cinco archivos conocidos precargados en memoria. `runtime.js` exige demostración y un libro independiente; no permite alternar a reales. Los visitantes no reciben el almacenamiento del dueño ni un libro compartido.
+- Vista previa 4174: exclusivamente `.preview-dist`, 13 recursos conocidos precargados en memoria. El límite por recurso es 256.000 bytes, con una excepción de 1.500.000 bytes exclusivamente para el bundle `scene.js`. `runtime.js` exige demostración y un libro independiente; no permite alternar a reales. Los visitantes no reciben el almacenamiento del dueño ni un libro compartido. Las fuentes `src/`, TypeScript, mapas de fuentes y `node_modules/` no forman parte del acceso público.
 - Código/configuración/archivos ocultos: sin `.env`, claves privadas ni credenciales encontradas en los archivos revisados. Las capturas existentes contienen demostración; respaldos de pruebas y metadatos de hosting quedan fuera de los recursos públicos. La búsqueda de patrones no constituye una garantía de ausencia de secretos.
-- `npm ls --all --offline`: cero dependencias npm. Node local: v22.22.2. No se consultaron registros ni bases externas de CVE, por la restricción de trabajar localmente; la vigencia de seguridad del runtime queda sin verificar.
+- La revisión inicial registró cero dependencias npm. El nuevo build declara Three.js 0.186.1 y herramientas de desarrollo esbuild 0.28.2, TypeScript 5.9.3 y tipos de Three.js 0.186.0; las versiones están fijadas y existe lockfile. Node local registrado: v22.22.2. No se consultaron registros ni bases externas de CVE en esta revisión local; las vulnerabilidades actuales de esas versiones y del runtime quedan sin verificar.
 
 ## Hallazgos y correcciones
 
@@ -27,15 +27,19 @@ No se encontró XSS ejecutable, inyección de comandos, recorrido de directorios
 
 ## Pruebas posteriores
 
-`npm test`: **34/34 aprobadas**. `npm run check`: aprobado. Las pruebas HTTP crean servidores efímeros exclusivamente en 127.0.0.1 y los cierran al terminar.
+Resultados registrados de la revisión inicial, anteriores al nuevo build 3D: `npm test`, **34/34 aprobadas**; `npm run check`, aprobado. No se extrapolan esos resultados a los cambios posteriores. Las pruebas HTTP crean servidores efímeros exclusivamente en 127.0.0.1 y los cierran al terminar.
 
-- 30 rutas denegadas: `.env`, `.git/config`, metadatos de hosting, código servidor, README, respaldos, capturas, traversal literal/codificado, propiedades heredadas, `/api`, `/admin`, depuración y rutas típicas de servidores de desarrollo.
+- Rutas denegadas: `.env`, `.git/config`, metadatos de hosting, código servidor, README, respaldos, capturas, traversal literal/codificado, propiedades heredadas, `/api`, `/admin`, depuración y rutas típicas de servidores de desarrollo.
 - Host inválido/duplicado/ausente, origen ajeno, Fetch Metadata cross-site, métodos POST/PUT/PATCH/DELETE/OPTIONS, cuerpo GET, WebSocket y CONNECT a otro puerto: sin acceso. GET/HEAD y assets permitidos siguen funcionando. Se verificaron bind, límites y encabezados.
 - JSON con tipos/montos/fechas inválidos, claves inesperadas, `__proto__`, 20.000 niveles de anidamiento, Unicode sobredimensionado y referencias manipuladas: rechazado sin modificar registros.
 - En navegador real, solo en 4174: descripción de formulario y respaldo con `</textarea>`, `<img onerror>`, `<svg onload>`, IDs con ruptura de atributo y motivos maliciosos. Cero nodos ejecutables insertados y cero diálogos de script; el texto se conserva escapado en historial, detalle y respaldo previo.
 - También se rechazó en la interfaz el JSON con `__proto__`, conservando el capital $215. Al terminar se importó una demostración limpia con el ejemplo obligatorio, dejando $214 y pendientes $3/$3; no quedan payloads de auditoría en la vista previa entregada.
 - Ejemplo obligatorio tras importar: capital Fran $12 / Yane $202, pendiente $3 por persona. Retirar $4 se bloquea; retirar $3 deja el capital total $214 intacto. Recarga conserva el resultado. Tras el cambio a Web Locks, venta de $5 y costo $0 produce reinversión $1, ganancias $4, repartos conservados y guardado correcto.
 - Pruebas del motor cubren aportes desiguales, ventas, 20% de la venta, reinversión, retiros, redondeos, déficits, correcciones/anulaciones, persistencia y respaldos. Pruebas con locks ficticios verifican serialización y conservación ante fallos de espacio. No se afirma haber hecho una prueba real de estrés entre múltiples navegadores.
+
+### Comprobación acotada del nuevo build 3D
+
+Se ejecutó `node --test tests/http-security.test.mjs` sobre el build disponible: **8/8 aprobadas**. Se verificaron los 13 recursos exactos y sus límites de tamaño, el tipo JavaScript y la igualdad del bundle servido con `dist/scene.js`; `src/scene.ts`, fuentes del controlador/motor, mapas, herramientas de build y la ruta de Three.js en `node_modules` devolvieron 404. Se mantuvieron las comprobaciones de Host/origen, CSP sin conexiones, ausencia de API, métodos de escritura y protocolos adicionales. Esta comprobación HTTP no vuelve a validar por sí sola la interfaz 3D en navegador ni consulta vulnerabilidades externas. No se abrió túnel ni se publicaron recursos.
 
 ## Exposición futura y cierre
 
@@ -51,4 +55,4 @@ Para cerrar: detener primero el proceso del túnel cuando exista y luego Ctrl+C 
 
 Los datos locales y respaldos no están cifrados por la aplicación; la bitácora no garantiza autenticidad frente al dueño del dispositivo. No hay autenticación de una contabilidad compartida. Navegadores sin Web Locks pueden consultar/exportar pero no guardar. No se verificaron Safari/iPhone físico, volumen adversarial de tráfico, vulnerabilidades actuales del runtime ni protección del futuro proveedor. La descarga por la API del navegador integrado no quedó confirmada; sí su serialización, importación y alternativa de copia completa.
 
-Cambios: `server.mjs`, `package.json`, `.gitignore`, `dist/app.js`, `dist/ledger.js`, `dist/index.html`, nuevo `dist/runtime.js`, scripts de compilación/vista previa, tres suites de seguridad, fixtures de prueba y documentación. No se añadieron dependencias ni se migraron/eliminaron registros reales.
+La revisión inicial cambió el servidor, configuración, recursos estáticos, scripts, pruebas y documentación, sin añadir dependencias ni migrar/eliminar registros reales. La actualización 3D separa fuentes en `src/` y genera `dist/`; sus dependencias añadidas y la comprobación HTTP acotada se detallan arriba. La preparación de la vista previa copia únicamente la lista pública explícita.

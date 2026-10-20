@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {resolve,dirname} from 'node:path';
 
 const projectRoot=fileURLToPath(new URL('./',import.meta.url));
-export const PUBLIC_FILES=Object.freeze(['index.html','app.js','ledger.js','style.css','runtime.js']);
+export const PUBLIC_FILES=Object.freeze(['index.html','app.js','ledger.js','style.css','runtime.js','format.js','storage.js','demo.js','views.js','game-ui.js','animation.js','sound.js','scene.js']);
 export const CSP="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'none'; manifest-src 'none'";
 const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8'};
 
@@ -16,7 +16,8 @@ export async function readStaticAssets(preview=false){
  const canonicalRoot=await realpath(directory),assets=new Map();
  for(const file of PUBLIC_FILES){
   const path=resolve(directory,file),stat=await lstat(path);
-  if(!stat.isFile()||stat.isSymbolicLink()||stat.size>256_000||dirname(await realpath(path))!==canonicalRoot)throw new Error('Archivo estático no permitido.');
+  const sizeLimit=file==='scene.js'?1_500_000:256_000;
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size>sizeLimit||dirname(await realpath(path))!==canonicalRoot)throw new Error('Archivo estático no permitido.');
   assets.set('/'+file,{body:await readFile(path),type:types[file.split('.').at(-1)]});
  }
  assets.set('/',assets.get('/index.html'));

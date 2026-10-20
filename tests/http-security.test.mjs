@@ -17,16 +17,33 @@ function request(path='/',{method='GET',headers={}}={}){
 }
 function rawRequest(message){return new Promise((resolve,reject)=>{const socket=net.connect(port,'127.0.0.1',()=>socket.write(message));let result='';socket.setEncoding('utf8');socket.setTimeout(2000,()=>socket.destroy(new Error('Timed out')));socket.on('data',data=>result+=data);socket.on('end',()=>resolve(result));socket.on('error',reject);});}
 
-test('preview solo sirve los cinco archivos compilados conocidos, en loopback',async()=>{
+test('preview solo sirve los trece recursos compilados conocidos, en loopback',async()=>{
  assert.equal(server.address().address,'127.0.0.1');
- const names=await readdir(new URL('../.preview-dist/',import.meta.url));assert.deepEqual(names.sort(),[...PUBLIC_FILES].sort());
- for(const path of ['/','/index.html','/app.js','/ledger.js','/style.css','/runtime.js'])assert.equal((await request(path)).status,200,path);
+ const expected=['index.html','app.js','ledger.js','style.css','runtime.js','format.js','storage.js','demo.js','views.js','game-ui.js','animation.js','sound.js','scene.js'];
+ assert.deepEqual([...PUBLIC_FILES].sort(),[...expected].sort());
+ const names=await readdir(new URL('../.preview-dist/',import.meta.url));assert.deepEqual(names.sort(),[...expected].sort());
+ assert.equal((await request('/')).status,200);
+ for(const file of expected){
+  const response=await request('/'+file);
+  assert.equal(response.status,200,file);
+  const bytes=Buffer.byteLength(response.body);
+  assert.equal(Number(response.headers['content-length']),bytes,file);
+  assert.ok(bytes<=(file==='scene.js'?1_500_000:256_000),file+' must stay within its specific static-asset limit');
+ }
  assert.equal((await request('/runtime.js')).body.trim(),'export const PREVIEW_ONLY = true;');
  assert.equal((await readFile(new URL('../dist/runtime.js',import.meta.url),'utf8')).trim(),'export const PREVIEW_ONLY = false;','preview build must preserve real entry');
  const head=await request('/',{method:'HEAD'});assert.equal(head.status,200);assert.equal(head.body,'');assert.ok(Number(head.headers['content-length'])>0);
 });
+test('el bundle local de Three está autorizado, conserva su tipo y coincide con el artefacto compilado',async()=>{
+ const response=await request('/scene.js');
+ assert.equal(response.status,200);
+ assert.equal(response.headers['content-type'],'text/javascript; charset=utf-8');
+ assert.equal(response.body,await readFile(new URL('../dist/scene.js',import.meta.url),'utf8'));
+ assert.match(response.body,/export\s*\{[^}]*\bcreateWorld\b/);
+ assert.equal(response.headers['access-control-allow-origin'],undefined);
+});
 test('archivos sensibles, recorridos y rutas administrativas no están expuestos',async()=>{
- const blocked=['/.env','/.env.local','/.git/config','/.openai/hosting.json','/README.md','/package.json','/server.mjs','/tests/example-backup.json','/capital-duo-desktop.png','/dist/index.html','/../README.md','/%2e%2e/README.md','/..%2f..%2fWindows/win.ini','/%2e%2e%5c..%5cWindows%5cwin.ini','/C:/Windows/win.ini','/app.js/../../.git/config','/__proto__','/constructor','/toString','/api','/api/movements','/api/export','/admin','/debug','/json/version','/@vite/client','/__vite_ping','/node_modules','/runtime.js.map','/backup.json'];
+ const blocked=['/.env','/.env.local','/.git/config','/.openai/hosting.json','/README.md','/package.json','/server.mjs','/tests/example-backup.json','/capital-duo-desktop.png','/dist/index.html','/../README.md','/%2e%2e/README.md','/..%2f..%2fWindows/win.ini','/%2e%2e%5c..%5cWindows%5cwin.ini','/C:/Windows/win.ini','/app.js/../../.git/config','/__proto__','/constructor','/toString','/api','/api/movements','/api/export','/admin','/debug','/json/version','/@vite/client','/__vite_ping','/node_modules','/runtime.js.map','/backup.json','/src/scene.ts','/scene.ts','/src/app.js','/src/ledger.js','/node_modules/three/build/three.module.js','/scene.js.map','/scripts/build.mjs','/package-lock.json'];
  for(const path of blocked){const response=await request(path);assert.equal(response.status,404,path);assert.equal(response.body,'No encontrado.');}
 });
 test('Host y origen son estrictos, sin confiar en encabezados de proxy',async()=>{
@@ -56,7 +73,7 @@ test('métodos de escritura, cuerpos, CORS y WebSocket no están disponibles',as
  const connect=await rawRequest(`CONNECT localhost:22 HTTP/1.1\r\nHost: localhost:${port}\r\nConnection: close\r\n\r\n`);assert.equal(connect.includes('200 Connection'),false,'no HTTP proxy to other ports');
 });
 test('encabezados bloquean enmarcado, conexiones y permisos innecesarios',async()=>{
- for(const path of ['/','/app.js','/.env']){
+ for(const path of ['/','/app.js','/scene.js','/.env']){
   const response=await request(path),h=response.headers;
   assert.equal(h['content-security-policy'],CSP);assert.match(CSP,/frame-ancestors 'none'/);assert.match(CSP,/connect-src 'none'/);assert.match(CSP,/script-src 'self'/);
   assert.equal(h['x-frame-options'],'DENY');assert.equal(h['x-content-type-options'],'nosniff');assert.equal(h['cache-control'],'no-store');assert.equal(h['referrer-policy'],'no-referrer');assert.equal(h['cross-origin-resource-policy'],'same-origin');assert.match(h['permissions-policy'],/camera=\(\)/);assert.equal(h['access-control-allow-origin'],undefined);

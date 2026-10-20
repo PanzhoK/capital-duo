@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {parseBackup,replay,saveBook,saveBookWithLock,MAX_AMOUNT} from '../dist/ledger.js';
+import {parseBackup,replay,saveBook,saveBookWithLock,MAX_AMOUNT} from '../src/ledger.js';
 
 const operation=()=>({kind:'contribution',person:'Fran',amount:10,cost:0,date:'2026-10-20',description:'Prueba local'});
 const event=()=>({id:'test-event',target:null,action:'create',at:'2026-10-20T12:00:00.000Z',reason:'',operation:operation()});

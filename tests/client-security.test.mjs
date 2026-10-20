@@ -3,11 +3,20 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import vm from 'node:vm';
-import * as ledger from '../dist/ledger.js';
+import * as ledger from '../src/ledger.js';
+import * as format from '../src/format.js';
+import * as views from '../src/views.js';
+import * as storage from '../src/storage.js';
+import * as demo from '../src/demo.js';
+import * as gameUI from '../src/game-ui.js';
+import * as animation from '../src/animation.js';
+import * as sound from '../src/sound.js';
+
+const helpers={...format,...views,...storage,...demo,...gameUI,...animation,...sound};
 
 // This checks the application's actual HTML generation with an in-memory DOM
 // facade. It never opens a browser, reads browser storage or writes a real book.
-const source=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8')
+const source=readFileSync(new URL('../src/app.js',import.meta.url),'utf8')
  .replace(/^import\s+[^\n]*;\s*$/gm,'');
 const payload='</textarea><img src=x onerror=alert(1)><svg onload=alert(2)>';
 const attributePayload='\"><img src=x onerror=alert(3)>';
@@ -22,7 +31,7 @@ function harness({preview=false,data=new Map(),locks=true}={}){
  const element=id=>{
   if(!elements.has(id))elements.set(id,{
    innerHTML:'',textContent:'',hidden:false,open:false,value:'',dataset:{},disabled:false,
-   classList:{toggle(){},remove(){}},setAttribute(){},addEventListener(){},focus(){},select(){},
+   listeners:new Map(),classList:{toggle(){},remove(){},add(){}},setAttribute(){},addEventListener(type,listener){this.listeners.set(type,listener);},focus(){},select(){},reset(){},
    showModal(){this.open=true;},close(){this.open=false;},
   });
   return elements.get(id);
@@ -32,8 +41,8 @@ function harness({preview=false,data=new Map(),locks=true}={}){
   setItem(key,value){accesses.push({action:'set',key});data.set(key,String(value));},
  };
  const context=vm.createContext({
-  ledger,PREVIEW_ONLY:preview,
-  document:{querySelector:element,querySelectorAll:()=>[],addEventListener(){},title:'',
+  ledger,helpers,PREVIEW_ONLY:preview,
+  document:{querySelector:element,querySelectorAll:()=>[],addEventListener(){},title:'',body:element('body'),
    createElement:()=>({click(){downloads.push(this.download);}})},
   window:{addEventListener(){},scrollTo(){}},
   crypto:{randomUUID},localStorage,Intl,Date,Blob,
@@ -42,6 +51,7 @@ function harness({preview=false,data=new Map(),locks=true}={}){
   setTimeout:()=>0,clearTimeout(){},console,
  });
  vm.runInContext('const {PEOPLE,emptyBook,replay,append,saleBreakdown,parseBackup,saveBook,saveBookWithLock,MAX_AMOUNT}=ledger;',context);
+ vm.runInContext('const {esc,fmt,dateFmt,today,icon,sum,kindLabel,table,historyView,growthView,backupView,readBook,readSettings,bookKey,settingKey,createDemoBook,gameView,personView,playbackView,createSalePlayer,lastActiveMovement,createSound}=helpers;',context);
  vm.runInContext(source,context,{filename:'app.js'});
  return {element,data,accesses,downloads,set:(name,value)=>{context[name]=value;},run:code=>vm.runInContext(code,context)};
 }
@@ -56,6 +66,7 @@ test('descripciones, motivos e IDs importados no crean marcado en historial o de
  const sample=hostileBook();
  ledger.parseBackup(JSON.stringify(sample));
  const app=harness({data:new Map([['capital-duo.real.v1',JSON.stringify(sample)]])});
+ app.run("changeView('history')");
  assertEscaped(app.element('#content').innerHTML);
  assert.match(app.element('#content').innerHTML,/data-detail="&quot;&gt;&lt;img/);
  app.run('detail(book.events[0].id)');
@@ -185,4 +196,22 @@ test('modo local conserva la separación existente entre libro real y demostraci
  assert.equal(app.run('state.total'),777);
  assert.equal(data.get('capital-duo.real.v1'),real);
  assert.equal(data.get('capital-duo.demo.v1'),demo);
+});
+
+test('un fallo visual después de guardar no ofrece reenviar ni duplica una venta',async()=>{
+ const initial=JSON.stringify(hostileBook(10));
+ const app=harness({data:new Map([['capital-duo.real.v1',initial]])});
+ app.run("openMovement('sale')");
+ app.element('#amount').value='20';app.element('#cost').value='10';
+ Object.defineProperty(app.element('#sale-player'),'innerHTML',{get(){return '';},set(){throw new Error('Fallo visual de prueba');}});
+ const submit=app.element('#movement-form').listeners.get('submit');
+ await submit({preventDefault(){}});
+ assert.equal(app.run('state.total'),14,'the saved sale keeps its exact financial result');
+ assert.equal(app.element('#movement-dialog').open,false);
+ assert.match(app.element('#toast').textContent,/Movimiento guardado/);
+ assert.equal(app.element('#form-error').textContent,'');
+ await submit({preventDefault(){}});
+ const writes=app.accesses.filter(access=>access.action==='set');
+ assert.equal(writes.length,1,'a second tap after the persisted sale cannot submit it again');
+ assert.equal(ledger.parseBackup(app.data.get('capital-duo.real.v1')).events.length,3);
 });

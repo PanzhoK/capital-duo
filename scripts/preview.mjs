@@ -1,6 +1,8 @@
 import {preparePreview} from './prepare-preview.mjs';
 import {startStaticServer,validatePreviewOrigin} from '../server.mjs';
+import {build} from './build.mjs';
 try{
+ await build();
  await preparePreview();
  const publicOrigin=validatePreviewOrigin(process.env.CAPITAL_DUO_PREVIEW_ORIGIN);
  const server=await startStaticServer({preview:true,publicOrigin});

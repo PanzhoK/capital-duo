@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+ <meta name="theme-color" content="#fbf4e6"><meta name="description" content="El pequeño mundo de Fran y Yane. Capital y ganancias claros, juntos.">
+ <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; manifest-src 'none'">
+ <title>Capital Dúo · Nuestra isla</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%2399cdb0'/%3E%3Cpath d='M15 20h20v9H24v15h-9zm34 24H29v-9h11V20h9z' fill='%232d594e'/%3E%3C/svg%3E">
+ <link rel="stylesheet" href="./style.css"><script type="module" src="./app.js"></script>
+</head>
+<body>
+ <a class="skip" href="#main">Ir al contenido</a>
+ <header class="game-header">
+  <a href="#" class="brand" aria-label="Capital Dúo, inicio"><span class="brand-mark"><i></i><b>c<span>d</span></b></span><span>capital <b>dúo<span>.</span></b><small>UN NEGOCIO. DOS SOCIOS.</small></span></a>
+  <nav class="main-nav" aria-label="Navegación principal">
+   <button class="nav-item selected" data-view="base"><span data-icon="base"></span>Nuestra isla</button>
+   <button class="nav-item" data-view="history"><span data-icon="history"></span>Movimientos</button>
+   <button class="nav-item" data-view="growth"><span data-icon="chart"></span>Evolución</button>
+   <button class="nav-item" data-view="backup"><span data-icon="backup"></span>Respaldos</button>
+  </nav>
+  <div class="header-tools"><button id="demo-toggle" class="demo-button"><span data-icon="play"></span><span>Explorar demo</span></button><button id="rules-button" class="help-button" aria-label="Cómo funciona el reparto">?</button></div>
+  <span id="page-name" class="sr-only">Nuestra isla</span>
+ </header>
+ <main id="main" tabindex="-1">
+  <div id="storage-alert" role="alert"></div>
+  <div id="demo-banner" hidden><span>✦ DEMOSTRACIÓN · Datos de ejemplo separados de tus registros reales.</span><button id="exit-demo">Volver a mis datos →</button></div>
+  <section class="page-heading" hidden><div><span class="eyebrow">EL CUADERNO DE CAPITAL DÚO</span><h1 id="heading"></h1><p id="subheading"></p></div><button class="button primary" id="new-movement"><span data-icon="plus"></span>Nuevo movimiento</button></section>
+  <section id="sale-player" class="sale-player" aria-label="Reparto de la venta guardada" aria-live="polite" hidden></section>
+  <div id="content"></div>
+  <footer class="main-footer"><span><span class="status-dot"></span><span id="save-status">Registros locales · Sin sincronización</span></span><span id="today-label"></span><span>Hecho para crecer juntos <b>✦</b></span></footer>
+ </main>
+ <dialog id="movement-dialog" aria-labelledby="movement-title">
+  <div class="dialog-head"><div><span class="eyebrow">CADA PESO TIENE SU LUGAR</span><h2 id="movement-title">Nuevo movimiento</h2></div><button class="icon-button" data-close aria-label="Cerrar">×</button></div>
+  <form id="movement-form" novalidate>
+   <div class="type-tabs" role="group" aria-label="Tipo de movimiento"><button type="button" data-kind="contribution">↗ Aporte</button><button type="button" data-kind="sale">◈ Venta</button><button type="button" data-kind="withdrawal">↙ Retiro</button></div>
+   <label id="person-field">¿De quién es este movimiento?<select id="person"><option>Fran</option><option>Yane</option></select></label>
+   <div class="form-grid"><label><span id="amount-label">Monto</span><div class="money-input"><span>$</span><input id="amount" inputmode="numeric" autocomplete="off" placeholder="0" required><span>CLP</span></div></label><label id="cost-field">Costo de esta operación<div class="money-input"><span>$</span><input id="cost" inputmode="numeric" autocomplete="off" placeholder="0"><span>CLP</span></div></label></div>
+   <details id="movement-extra" class="movement-extra"><summary>Fecha y nota <span>Opcional</span></summary><label>Fecha<input type="date" id="date" required></label><label>Descripción<input id="description" maxlength="160" placeholder="Por ejemplo, pedido de primavera"></label></details>
+   <label id="reason-field" hidden>Motivo de la corrección<input id="reason" maxlength="240" placeholder="Explica qué cambió"></label>
+   <div id="preview" aria-live="polite"></div><p id="form-error" class="error" role="alert"></p>
+   <div class="dialog-actions"><button type="button" class="button secondary" data-close>Cancelar</button><button type="submit" class="button primary" id="confirm-movement">Confirmar y guardar →</button></div>
+  </form>
+ </dialog>
+ <dialog id="info-dialog" aria-labelledby="info-title"><div class="dialog-head"><h2 id="info-title"></h2><button class="icon-button" data-close aria-label="Cerrar">×</button></div><div id="info-body"></div></dialog>
+ <div id="toast" role="status" hidden></div>
+</body></html>
